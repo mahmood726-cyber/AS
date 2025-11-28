@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Asymptomatic Aortic Stenosis Evidence Synthesis (Methodologically Updated)">
+    <title>AS-Logic | Robust Meta-Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0d12;
+            --bg-secondary: #12171f;
+            --bg-tertiary: #1a2130;
+            --bg-card: #161d2a;
+            --border-color: #2a3444;
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            /* Semantic Colors - AS Specific */
+            --accent-cyan: #06b6d4;     /* TAVR */
+            --accent-purple: #a855f7;    /* SAVR (Surgery) */
+            --accent-success: #22c55e;   /* Benefit */
+            --accent-danger: #ef4444;    /* Harm */
+            --accent-warn: #eab308;      /* Caution */
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 360px 1fr 400px;
+            grid-template-rows: 100vh;
+            gap: 1px;
+            background: var(--border-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        @media (max-width: 1400px) { .app-container { grid-template-columns: 320px 1fr 360px; } }
+        @media (max-width: 1100px) { 
+            .app-container { grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; height: auto; overflow: visible; }
+            .panel:last-child { grid-column: 1 / -1; border-top: 1px solid var(--border-color); }
+        }
+        @media (max-width: 768px) {
+            .app-container { display: flex; flex-direction: column; height: auto; }
+            .results-grid { grid-template-columns: repeat(2, 1fr); }
+            .results-grid .result-card:last-child { grid-column: 1 / -1; }
+        }
+        
+        /* Panels */
+        .panel { background: var(--bg-secondary); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        .panel-header {
+            font-family: 'Instrument Serif', serif; font-size: 1.5rem; margin-bottom: 20px;
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        
+        .version-badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; background: var(--accent-success);
+            color: var(--bg-primary); padding: 2px 8px; border-radius: 4px; font-weight: 600;
+        }
+
+        .method-badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--accent-warn);
+            border: 1px solid var(--accent-warn); padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+        }
+        
+        /* Lists & Presets */
+        .section-title {
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);
+            margin: 24px 0 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .preset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+        
+        .preset-btn {
+            background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;
+            color: var(--text-secondary); cursor: pointer; font-size: 0.75rem; font-weight: 500; text-align: left; transition: all 0.2s;
+        }
+        .preset-btn:hover { border-color: var(--accent-cyan); color: var(--text-primary); }
+        .preset-btn.active { background: var(--accent-cyan); color: var(--bg-primary); border-color: var(--accent-cyan); }
+        .preset-btn span { display: block; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
+        .preset-btn.active span { color: rgba(10, 13, 18, 0.7); }
+        
+        /* Trials */
+        .trial-grid { display: flex; flex-direction: column; gap: 8px; }
+        .trial-item {
+            background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;
+            cursor: pointer; transition: all 0.2s; position: relative; user-select: none;
+        }
+        .trial-item:hover { border-color: var(--accent-cyan); transform: translateX(2px); }
+        .trial-item.selected { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05); }
+        .trial-item.excluded { opacity: 0.4; pointer-events: none; filter: grayscale(1); }
+        .trial-item.trial-sig-positive { border-left: 3px solid var(--accent-success); }
+        .trial-item.trial-sig-neutral { border-left: 3px solid var(--text-muted); }
+        
+        .trial-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .trial-name { font-weight: 600; font-size: 0.9rem; }
+        .trial-device { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+        .device-tavr { color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); }
+        .device-savr { color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.3); }
+        
+        .trial-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-family: 'JetBrains Mono', monospace; margin-top: 8px; }
+        .trial-stat { text-align: center; }
+        .trial-stat-value { font-size: 0.8rem; font-weight: 600; }
+        .trial-stat-label { font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; }
+
+        /* Forest Plot Area */
+        .center-panel { background: var(--bg-primary); display: flex; flex-direction: column; position: relative; }
+        .forest-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;
+            align-items: center; background: var(--bg-secondary);
+        }
+        .forest-container { flex: 1; padding: 20px; position: relative; cursor: crosshair; min-height: 400px; }
+        .forest-container canvas { width: 100%; height: 100%; display: block; }
+        
+        #forestTooltip {
+            position: absolute; background: rgba(14, 18, 26, 0.95); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 10px; pointer-events: none; opacity: 0; transition: opacity 0.1s;
+            font-size: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); z-index: 100;
+        }
+
+        /* Results Grid */
+        .results-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 16px 20px;
+            background: var(--bg-secondary); border-top: 1px solid var(--border-color);
+        }
+        .result-card {
+            background: var(--bg-card); border-radius: 8px; padding: 14px; text-align: center;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .result-value { font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; font-weight: 600; color: var(--text-primary); }
+        .result-ci { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+        .result-label { font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px; text-transform: uppercase; }
+        .result-value.significant { color: var(--accent-success); }
+        .result-value.neutral { color: var(--text-secondary); }
+
+        /* Right Panel */
+        .viz-card { background: var(--bg-card); border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--border-color); }
+        .waffle-container { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin-bottom: 12px; aspect-ratio: 2/1; }
+        .waffle-cell { aspect-ratio: 1; border-radius: 50%; background: var(--bg-tertiary); transition: background 0.3s ease; }
+        .waffle-cell.benefit { background: var(--accent-success); }
+        .waffle-cell.harm { background: var(--accent-danger); }
+        
+        .waffle-text { font-size: 0.8rem; text-align: center; margin-bottom: 8px; color: var(--text-secondary); }
+        .waffle-text strong { color: var(--text-primary); }
+
+        .method-note {
+            font-size: 0.7rem; color: var(--text-muted); padding: 12px; background: rgba(234, 179, 8, 0.05);
+            border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 6px; line-height: 1.6; margin-top: 20px;
+        }
+
+        /* Toggle */
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+        .toggle { width: 40px; height: 22px; background: var(--bg-tertiary); border-radius: 11px; position: relative; cursor: pointer; }
+        .toggle.active { background: var(--accent-cyan); }
+        .toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: left 0.2s; }
+        .toggle.active::after { left: 20px; }
+        
+        /* Stats Table for Subgroups */
+        .subgroup-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 10px; }
+        .subgroup-table td { padding: 6px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+        .subgroup-table td:last-child { text-align: right; font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- LEFT PANEL -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="header-left">
+                    AS-Logic
+                    <span class="version-badge">v2.0</span>
+                    <span class="method-badge">HKSJ Active</span>
+                </div>
+            </div>
+            
+            <div class="section-title">Analysis Presets</div>
+            <div class="preset-grid">
+                <button class="preset-btn active" id="btn-all" onclick="setPreset('all_intervention')">
+                    All Early Intervention
+                    <span>TAVR + SAVR</span>
+                </button>
+                <button class="preset-btn" id="btn-tavr" onclick="setPreset('tavr_only')">
+                    Early TAVR Only
+                    <span>EARLY-TAVR</span>
+                </button>
+                <button class="preset-btn" id="btn-surg" onclick="setPreset('surgical')">
+                    Surgical Series
+                    <span>RECOVERY/AVATAR</span>
+                </button>
+                <button class="preset-btn" id="btn-mod" onclick="setPreset('modern')">
+                    Modern Era (>2023)
+                    <span>EVOLVED + EARLY-TAVR</span>
+                </button>
+            </div>
+            
+            <div class="toggle-row">
+                <label for="fibrosisToggle" style="font-size: 0.8rem; cursor: pointer; color: var(--text-secondary);">Exclude fibrosis-guided (EVOLVED)</label>
+                <div class="toggle" id="fibrosisToggle" onclick="toggleFibrosis()"></div>
+            </div>
+            
+            <div class="section-title">
+                Included Studies
+                <span style="color: var(--accent-cyan); margin-left: auto;" id="selectedCount">4 selected</span>
+            </div>
+            
+            <div class="trial-grid" id="trialList"></div>
+            
+            <div class="method-note">
+                <strong>Methodological Update:</strong> <br>
+                1. <strong>HKSJ Adjustment:</strong> Standard Errors are adjusted using Hartung-Knapp-Sidik-Jonkman method for small study counts.<br>
+                2. <strong>Dynamic Prediction:</strong> Intervals use t-distribution critical values based on degrees of freedom ($k-2$).<br>
+                3. <strong>Interaction:</strong> Subgroup p-values calculated when mixing modalities.
+            </div>
+        </div>
+        
+        <!-- CENTER PANEL -->
+        <div class="center-panel">
+            <div class="forest-header">
+                <div style="display:flex; flex-direction:column;">
+                    <div style="font-weight:600; font-size:0.9rem;">Primary Composite Endpoint</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">Random Effects (DerSimonian-Laird + HKSJ)</div>
+                </div>
+                <button style="background:transparent; border:1px solid var(--border-color); color:var(--text-secondary); padding:4px 8px; border-radius:4px; font-size:0.7rem; cursor:pointer;" onclick="copyResults()">
+                    Copy Data
+                </button>
+            </div>
+            
+            <div class="forest-container" id="forestContainer">
+                <canvas id="forestPlot"></canvas>
+                <div id="forestTooltip"></div>
+            </div>
+            
+            <div class="results-grid">
+                <div class="result-card">
+                    <div class="result-value" id="pooledHR">--</div>
+                    <div class="result-ci" id="pooledCI">--</div>
+                    <div class="result-label">Pooled HR (HKSJ)</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="predInt">--</div>
+                    <div class="result-ci">95% PI</div>
+                    <div class="result-label">Prediction Int</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="hetI2">--</div>
+                    <div class="result-ci" id="hetTau">--</div>
+                    <div class="result-label">Heterogeneity</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="interactionP">--</div>
+                    <div class="result-ci" id="interactionLabel">Subgroup Test</div>
+                    <div class="result-label">Interaction P</div>
+                </div>
+                <div class="result-card">
+                    <div class="result-value" id="pValue">--</div>
+                    <div class="result-ci" id="sigNote">--</div>
+                    <div class="result-label">Model P-Value</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- RIGHT PANEL -->
+        <div class="panel">
+            <div class="panel-header" style="font-size: 1.2rem;">Translation</div>
+            
+            <div class="viz-card">
+                <div style="font-size:0.8rem; font-weight:600; margin-bottom:12px; display:flex; justify-content:space-between;">
+                    <span>Clinical Impact (Per 100)</span>
+                    <span style="font-family:'JetBrains Mono'; color:var(--accent-cyan);">NNT Analysis</span>
+                </div>
+                <div class="waffle-text" id="nntText">
+                    NNT: <strong>--</strong> [95% CI: -- to --]
+                </div>
+                <div class="waffle-container" id="waffleChart"></div>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.7rem; color: var(--text-secondary); margin-top:8px;">
+                    <div style="display:flex; align-items:center; gap:4px;"><div style="width:8px; height:8px; background:var(--accent-success); border-radius:50%;"></div>Events Prevented</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><div style="width:8px; height:8px; background:var(--accent-danger); border-radius:50%;"></div>Possible Harm</div>
+                </div>
+            </div>
+
+            <div class="section-title">Subgroup Details</div>
+            <div class="viz-card">
+                <table class="subgroup-table">
+                    <tr><td>TAVR Estimate</td><td id="sg-tavr">--</td></tr>
+                    <tr><td>SAVR Estimate</td><td id="sg-savr">--</td></tr>
+                    <tr><td>Heterogeneity (I²)</td><td id="sg-i2">--</td></tr>
+                </table>
+            </div>
+
+            <div class="section-title">Evidence Certainty</div>
+            <div id="gradeContainer"></div>
+
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:auto; padding-top:20px; text-align:center;">
+                * Assumes 30% baseline risk over 4 years based on control arms of comprised trials.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA MODEL ---
+        // Note: Using published HRs/CIs as primary data source to match official reports.
+        // Raw events included for weighting context but math uses adjusted HRs.
+        const trials = [
+            { id: 'recovery', name: 'RECOVERY', year: 2020, device: 'SAVR', n: 145, hr: 0.35, ci_lower: 0.16, ci_upper: 0.76, selected: true, events_int: 1, events_ctrl: 11, is_fibrosis: false },
+            { id: 'avatar', name: 'AVATAR', year: 2021, device: 'SAVR', n: 157, hr: 0.46, ci_lower: 0.23, ci_upper: 0.90, selected: true, events_int: 13, events_ctrl: 26, is_fibrosis: false },
+            { id: 'evolved', name: 'EVOLVED', year: 2024, device: 'SAVR', n: 224, hr: 0.96, ci_lower: 0.50, ci_upper: 1.82, selected: true, events_int: 20, events_ctrl: 21, is_fibrosis: true },
+            { id: 'early_tavr', name: 'EARLY-TAVR', year: 2024, device: 'TAVR', n: 901, hr: 0.50, ci_lower: 0.35, ci_upper: 0.71, selected: true, events_int: 121, events_ctrl: 230, is_fibrosis: false }
+        ];
+
+        let state = { excludeFibrosis: false, currentPreset: 'all_intervention' };
+
+        // --- STATISTICAL ENGINE v2.0 ---
+
+        // T-Distribution lookup (Two-tailed, alpha=0.05)
+        // Keys are degrees of freedom (df)
+        const tTable = {
+            1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 
+            6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+            100: 1.984 // fallback for large N
+        };
+
+        function getTScore(df) {
+            if (df <= 0) return 12.7; // Ultra conservative for 1 study
+            if (df > 10) return 1.96;
+            return tTable[df] || 2.0;
+        }
+
+        // Chi-Square Cumulative Distribution Function (for Interaction P-value)
+        function chiSqPval(chi, df) {
+            if (df <= 0) return 0;
+            // Approximation for df=1 (most common here)
+            if (df === 1) {
+                // Wilson-Hilferty not great for df=1, using simple approx for 1 DoF:
+                // ChiSq(1) is square of Normal.
+                return 2 * (1 - normalCdf(Math.sqrt(chi)));
+            }
+            return 1; // Placeholder for high DF, not needed for this app
+        }
+        
+        function normalCdf(x) {
+            var t = 1 / (1 + .2316419 * x);
+            var d = .3989423 * Math.exp(-x * x / 2);
+            var p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+            return p;
+        }
+
+        function calculateMetaAnalysis(subsetTrials) {
+            if (!subsetTrials || subsetTrials.length === 0) return null;
+            const k = subsetTrials.length;
+
+            // 1. Calculate Log HR and Variance per study
+            let sumWi = 0, sumWiYi = 0, sumWiYi2 = 0, sumWi2 = 0;
+
+            subsetTrials.forEach(t => {
+                // If using raw counts, we would add 0.5 correction here.
+                // Since using adjusted HRs, we derive variance from CI.
+                // Log transformation
+                t.logHR = Math.log(t.hr);
+                t.se = (Math.log(t.ci_upper) - Math.log(t.ci_lower)) / 3.92;
+                t.variance = t.se * t.se;
+                
+                // Fixed Effect Weight (Inverse Variance)
+                t.fe_weight = 1 / t.variance;
+                
+                sumWi += t.fe_weight;
+                sumWiYi += t.fe_weight * t.logHR;
+                sumWiYi2 += t.fe_weight * Math.pow(t.logHR, 2);
+                sumWi2 += (t.fe_weight * t.fe_weight);
+            });
+
+            // 2. Heterogeneity (Q and I^2)
+            const Q = subsetTrials.reduce((acc, t) => acc + t.fe_weight * Math.pow(t.logHR - (sumWiYi/sumWi), 2), 0);
+            const df = k - 1;
+            const I2 = k > 1 ? Math.max(0, (Q - df) / Q) * 100 : 0;
+
+            // 3. Tau^2 (DerSimonian-Laird)
+            let tau2 = 0;
+            if (k > 1 && Q > df) {
+                const c = sumWi - (sumWi2 / sumWi);
+                tau2 = (Q - df) / c;
+            }
+
+            // 4. Random Effects Weights
+            let sumWiStar = 0, sumWiStarYi = 0;
+            subsetTrials.forEach(t => {
+                t.re_weight = 1 / (t.variance + tau2);
+                sumWiStar += t.re_weight;
+                sumWiStarYi += t.re_weight * t.logHR;
+            });
+            
+            // Normalize weights
+            subsetTrials.forEach(t => t.final_weight_pct = (t.re_weight / sumWiStar) * 100);
+
+            // 5. Pooled Point Estimate
+            const pooledLogHR = sumWiStarYi / sumWiStar;
+            
+            // 6. HKSJ Standard Error Adjustment (Small Sample Correction)
+            let finalSE = Math.sqrt(1 / sumWiStar); // Default standard RE SE
+            
+            if (k >= 2) {
+                // Weighted variance of estimates
+                const weightedVar = subsetTrials.reduce((acc, t) => {
+                    return acc + t.re_weight * Math.pow(t.logHR - pooledLogHR, 2);
+                }, 0);
+                
+                const hksjFactor = weightedVar / ((k - 1) * sumWiStar);
+                const seHKSJ = Math.sqrt(hksjFactor);
+                
+                // Use the larger of the two to be conservative (Knapp-Hartung logic)
+                finalSE = Math.max(finalSE, seHKSJ);
+            }
+
+            // 7. Confidence Intervals using T-distribution (Dynamic DF)
+            // Use k-1 for the CI t-score
+            const tScoreCI = getTScore(k - 1); 
+            const pooledLower = Math.exp(pooledLogHR - tScoreCI * finalSE);
+            const pooledUpper = Math.exp(pooledLogHR + tScoreCI * finalSE);
+            const pooledHR = Math.exp(pooledLogHR);
+
+            // 8. Prediction Interval (Dynamic)
+            // PI incorporates Tau2 and uses t-distribution
+            const sePred = Math.sqrt((finalSE*finalSE) + tau2);
+            // Use k-2 for PI t-score (standard convention for PI), but if k=2, use k-1 or conservative
+            const dfPI = Math.max(1, k - 2); 
+            const tScorePI = getTScore(dfPI);
+            
+            const piLower = Math.exp(pooledLogHR - tScorePI * sePred); 
+            const piUpper = Math.exp(pooledLogHR + tScorePI * sePred);
+
+            // 9. P-Value (using T-dist)
+            const tStat = Math.abs(pooledLogHR / finalSE);
+            // Rough p-val approximation from T-stat if no library available
+            // For UI purposes, we check significance against the CI
+            const isSignificant = (pooledLower < 1.0 && pooledUpper < 1.0) || (pooledLower > 1.0 && pooledUpper > 1.0);
+            
+            return {
+                pooledHR, pooledLower, pooledUpper, pooledLogHR,
+                piLower, piUpper,
+                I2, tau2, Q, df,
+                subsetTrials,
+                totalN: subsetTrials.reduce((sum, t) => sum + t.n, 0),
+                isSignificant
+            };
+        }
+
+        // --- UI & RENDERING ---
+
+        function updateUI() {
+            // Filter trials based on UI state
+            const activeTrials = trials.filter(t => t.selected && !(state.excludeFibrosis && t.is_fibrosis));
+            
+            if(activeTrials.length === 0) {
+                renderEmptyState();
+                return;
+            }
+
+            const res = calculateMetaAnalysis(activeTrials);
+
+            // 1. Main Results
+            document.getElementById('pooledHR').innerText = res.pooledHR.toFixed(2);
+            document.getElementById('pooledCI').innerText = `${res.pooledLower.toFixed(2)}–${res.pooledUpper.toFixed(2)}`;
+            document.getElementById('pooledHR').className = `result-value ${res.isSignificant ? 'significant' : 'neutral'}`;
+            
+            // Handle PI display for small N
+            if (activeTrials.length < 3) {
+                document.getElementById('predInt').innerText = "N/A (k<3)";
+            } else {
+                document.getElementById('predInt').innerText = `${res.piLower.toFixed(2)}–${res.piUpper.toFixed(2)}`;
+            }
+            
+            document.getElementById('hetI2').innerText = `${res.I2.toFixed(0)}%`;
+            document.getElementById('hetTau').innerText = `τ²=${res.tau2.toFixed(2)}`;
+            
+            document.getElementById('pValue').innerText = res.isSignificant ? "<0.05" : "NS";
+            document.getElementById('sigNote').innerText = res.isSignificant ? "Significant" : "Not Sig.";
+            document.getElementById('selectedCount').innerText = `${res.subsetTrials.length} selected`;
+
+            // 2. Weights in List
+            res.subsetTrials.forEach(t => {
+                const el = document.getElementById(`weight-${t.id}`);
+                if(el) el.innerText = `${t.final_weight_pct.toFixed(0)}%`;
+            });
+
+            // 3. Subgroup Interaction Test
+            calculateSubgroups(activeTrials, res);
+
+            // 4. Update Visuals
+            updateGrade(res);
+            updateWaffle(res);
+            drawForestPlot(res);
+        }
+
+        function calculateSubgroups(activeTrials, overallRes) {
+            // Only calculate if we have both TAVR and SAVR present
+            const hasTAVR = activeTrials.some(t => t.device === 'TAVR');
+            const hasSAVR = activeTrials.some(t => t.device === 'SAVR');
+
+            const tavrRes = calculateMetaAnalysis(activeTrials.filter(t => t.device === 'TAVR'));
+            const savrRes = calculateMetaAnalysis(activeTrials.filter(t => t.device === 'SAVR'));
+
+            // Update Table
+            document.getElementById('sg-tavr').innerText = tavrRes ? `${tavrRes.pooledHR.toFixed(2)} [${tavrRes.pooledLower.toFixed(2)}-${tavrRes.pooledUpper.toFixed(2)}]` : "—";
+            document.getElementById('sg-savr').innerText = savrRes ? `${savrRes.pooledHR.toFixed(2)} [${savrRes.pooledLower.toFixed(2)}-${savrRes.pooledUpper.toFixed(2)}]` : "—";
+            document.getElementById('sg-i2').innerText = overallRes.I2.toFixed(0) + "%";
+
+            // Interaction Test (Q_total - sum(Q_subgroups)) ?? 
+            // Better: Q_between = sum( w_j * (logHR_j - logHR_total)^2 )
+            // Where j is subgroup.
+            if (hasTAVR && hasSAVR && tavrRes && savrRes) {
+                // Inverse variance weights for the subgroups based on their SEs
+                // SE derived from CI
+                const wTavr = 1 / Math.pow((Math.log(tavrRes.pooledUpper) - Math.log(tavrRes.pooledLower))/3.92, 2);
+                const wSavr = 1 / Math.pow((Math.log(savrRes.pooledUpper) - Math.log(savrRes.pooledLower))/3.92, 2);
+                
+                // Pooled mean of subgroups (fixed effect of subgroups)
+                const meanLogHR = (wTavr * tavrRes.pooledLogHR + wSavr * savrRes.pooledLogHR) / (wTavr + wSavr);
+                
+                // Q_between
+                const Qbet = wTavr * Math.pow(tavrRes.pooledLogHR - meanLogHR, 2) + 
+                             wSavr * Math.pow(savrRes.pooledLogHR - meanLogHR, 2);
+                
+                const pInteract = chiSqPval(Qbet, 1);
+                
+                document.getElementById('interactionP').innerText = pInteract.toFixed(2);
+                document.getElementById('interactionLabel').innerText = "P_interaction";
+            } else {
+                document.getElementById('interactionP').innerText = "—";
+                document.getElementById('interactionLabel').innerText = "Homogeneous";
+            }
+        }
+
+        function updateWaffle(res) {
+            const container = document.getElementById('waffleChart');
+            container.innerHTML = '';
+            
+            // Baseline Risk (approx 30% over 4 years)
+            const baseline = 0.30;
+            
+            // NNT Calculation with CI
+            // NNT = 1 / ARR = 1 / (Baseline - (Baseline * HR))
+            // NNT_low = 1 / (Baseline - (Baseline * HR_low)) -> Actually corresponds to HR_low which gives max benefit
+            // Correct mapping: HR_lower -> ARR_higher -> NNT_lower
+            
+            const arrPoint = baseline - (baseline * res.pooledHR);
+            const arrLow = baseline - (baseline * res.pooledUpper); // Lower benefit
+            const arrHigh = baseline - (baseline * res.pooledLower); // Higher benefit
+            
+            // Handle negative ARR (harm) for CI bounds
+            const nntPoint = arrPoint > 0 ? Math.round(1/arrPoint) : "∞";
+            const nntLow = arrHigh > 0 ? Math.round(1/arrHigh) : "∞"; // Best case NNT
+            const nntHigh = arrLow > 0 ? Math.round(1/arrLow) : "Harm"; // Worst case NNT
+
+            document.getElementById('nntText').innerHTML = 
+                `NNT: <strong>${nntPoint}</strong> [95% CI: ${nntLow} to ${nntHigh}]`;
+
+            // Draw Dots (Point Estimate)
+            const saved = Math.max(0, Math.round(arrPoint * 100));
+            const harm = 1; // 1% Procedural Hazard (assumption)
+            const neutral = 100 - saved - harm;
+
+            for(let i=0; i<saved; i++) container.innerHTML += `<div class="waffle-cell benefit"></div>`;
+            for(let i=0; i<harm; i++) container.innerHTML += `<div class="waffle-cell harm"></div>`;
+            for(let i=0; i<neutral; i++) container.innerHTML += `<div class="waffle-cell"></div>`;
+        }
+
+        function updateGrade(res) {
+            const container = document.getElementById('gradeContainer');
+            let certainty = "High";
+            let reasons = [];
+            let cssClass = "trial-sig-positive"; // borrowing green color
+            
+            // Downgrade Criteria
+            if (res.I2 > 50) { certainty = "Moderate"; reasons.push("Inconsistency"); cssClass="trial-sig-neutral"; }
+            if (res.subsetTrials.length < 3) { certainty = "Low"; reasons.push("Imprecision (k<3)"); cssClass="excluded"; }
+            if (!res.isSignificant && res.pooledUpper < 0.8) { reasons.push("Wide CI"); } // Arbitrary width check
+
+            container.innerHTML = `
+                <div class="result-card" style="border:1px solid var(--border-color); text-align:left; align-items:flex-start;">
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">${certainty} Certainty</div>
+                    <div style="font-size:0.7rem; color:var(--text-secondary); margin-top:4px;">${reasons.length ? "Downgraded for: " + reasons.join(", ") : "No major limitations detected in pooled set."}</div>
+                </div>
+            `;
+        }
+
+        // --- CANVAS RENDERING ---
+        
+        function drawForestPlot(data) {
+            const container = document.getElementById('forestContainer');
+            const canvas = document.getElementById('forestPlot');
+            const ctx = canvas.getContext('2d');
+            
+            // DPI Fix
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const trials = data.subsetTrials;
+            const xMargin = 40;
+            const yStart = 50;
+            const rowH = 40;
+            const w = rect.width - (xMargin * 2);
+
+            // X-Axis Scale (Log)
+            // Determine nice boundaries based on data
+            const minLog = Math.log(0.1);
+            const maxLog = Math.log(3.0);
+            const rangeLog = maxLog - minLog;
+
+            const getX = (val) => xMargin + ((Math.log(Math.max(0.01, val)) - minLog) / rangeLog) * w;
+
+            ctx.clearRect(0,0, rect.width, rect.height);
+
+            // Guidelines
+            ctx.strokeStyle = '#2a3444';
+            ctx.lineWidth = 1;
+            [0.2, 0.5, 1.0, 2.0].forEach(v => {
+                const x = getX(v);
+                ctx.beginPath();
+                ctx.moveTo(x, 20); ctx.lineTo(x, rect.height - 30);
+                ctx.stroke();
+                ctx.fillStyle = '#64748b'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'center';
+                ctx.fillText(v, x, rect.height - 10);
+            });
+            
+            // Line of Unity
+            ctx.beginPath(); ctx.moveTo(getX(1), 20); ctx.lineTo(getX(1), rect.height - 30);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+
+            // Draw Trials
+            trials.forEach((t, i) => {
+                const y = yStart + (i * rowH);
+                const xl = getX(t.ci_lower);
+                const xr = getX(t.ci_upper);
+                const x = getX(t.hr);
+                
+                // Whiskers
+                ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(xl, y); ctx.lineTo(xr, y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(xl, y-4); ctx.lineTo(xl, y+4); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(xr, y-4); ctx.lineTo(xr, y+4); ctx.stroke();
+                
+                // Box
+                const sz = 6 + (t.final_weight_pct / 5);
+                ctx.fillStyle = t.device === 'TAVR' ? '#06b6d4' : '#a855f7';
+                ctx.fillRect(x - sz/2, y - sz/2, sz, sz);
+            });
+
+            // Pooled Diamond
+            const yPool = yStart + (trials.length * rowH) + 20;
+            const xl = getX(data.pooledLower);
+            const xr = getX(data.pooledUpper);
+            const xm = getX(data.pooledHR);
+            
+            ctx.beginPath();
+            ctx.fillStyle = '#fff';
+            ctx.moveTo(xl, yPool); ctx.lineTo(xm, yPool - 7); ctx.lineTo(xr, yPool); ctx.lineTo(xm, yPool + 7);
+            ctx.fill();
+
+            // Prediction Interval (Red Dashed)
+            if (data.subsetTrials.length >= 3) {
+                const pil = getX(data.piLower);
+                const pir = getX(data.piUpper);
+                ctx.beginPath(); ctx.strokeStyle = '#ef4444'; ctx.setLineDash([3, 3]); ctx.lineWidth = 2;
+                ctx.moveTo(pil, yPool + 12); ctx.lineTo(pir, yPool + 12);
+                ctx.stroke(); ctx.setLineDash([]);
+                
+                // PI Whiskers
+                ctx.beginPath(); ctx.moveTo(pil, yPool + 8); ctx.lineTo(pil, yPool + 16); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(pir, yPool + 8); ctx.lineTo(pir, yPool + 16); ctx.stroke();
+            }
+
+            // Labels
+            ctx.font = '10px Outfit'; ctx.fillStyle = '#64748b';
+            ctx.fillText("Intervention Better", getX(0.3), 15);
+            ctx.fillText("Surveillance Better", getX(1.8), 15);
+            
+            // Store for tooltip
+            canvas.dataMap = { trials, yStart, rowH };
+        }
+
+        // --- INTERACTION ---
+
+        function renderEmptyState() {
+            document.getElementById('forestContainer').innerHTML = '<div style="color:#64748b; text-align:center; padding-top:100px;">No trials selected</div>';
+        }
+
+        function renderTrialList() {
+            const container = document.getElementById('trialList');
+            container.innerHTML = '';
+            trials.forEach(t => {
+                let cls = 'trial-item ' + (t.selected ? 'selected ' : '') + ((state.excludeFibrosis && t.is_fibrosis) ? 'excluded' : '');
+                if (t.ci_upper < 1.0) cls += ' trial-sig-positive'; else cls += ' trial-sig-neutral';
+                
+                container.innerHTML += `
+                    <div class="${cls}" onclick="toggleTrial('${t.id}')">
+                        <div class="trial-header">
+                            <span class="trial-name">${t.name} <span style="font-weight:400; color:var(--text-muted);">'${t.year.toString().slice(2)}</span></span>
+                            <span class="trial-device ${t.device === 'TAVR' ? 'device-tavr' : 'device-savr'}">${t.device}</span>
+                        </div>
+                        <div class="trial-stats">
+                            <div class="trial-stat"><div class="trial-stat-value">${t.n}</div><div class="trial-stat-label">N</div></div>
+                            <div class="trial-stat"><div class="trial-stat-value">${t.hr.toFixed(2)}</div><div class="trial-stat-label">HR</div></div>
+                            <div class="trial-stat"><div class="trial-stat-value">${t.ci_lower}-${t.ci_upper}</div><div class="trial-stat-label">95% CI</div></div>
+                            <div class="trial-stat"><div class="trial-stat-value" id="weight-${t.id}">--%</div><div class="trial-stat-label">W(RE)</div></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function toggleTrial(id) {
+            const t = trials.find(x => x.id === id);
+            if(state.excludeFibrosis && t.is_fibrosis) return;
+            t.selected = !t.selected;
+            renderTrialList(); updateUI();
+        }
+
+        function toggleFibrosis() {
+            const el = document.getElementById('fibrosisToggle');
+            state.excludeFibrosis = !state.excludeFibrosis;
+            state.excludeFibrosis ? el.classList.add('active') : el.classList.remove('active');
+            renderTrialList(); updateUI();
+        }
+
+        function setPreset(key) {
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            state.currentPreset = key;
+            
+            if(key === 'all_intervention') {
+                document.getElementById('btn-all').classList.add('active');
+                state.excludeFibrosis = false;
+                trials.forEach(t => t.selected = true);
+            } else if (key === 'tavr_only') {
+                document.getElementById('btn-tavr').classList.add('active');
+                trials.forEach(t => t.selected = t.id === 'early_tavr');
+            } else if (key === 'surgical') {
+                document.getElementById('btn-surg').classList.add('active');
+                trials.forEach(t => t.selected = t.device === 'SAVR');
+            } else if (key === 'modern') {
+                document.getElementById('btn-mod').classList.add('active');
+                trials.forEach(t => t.selected = t.year > 2023);
+            }
+            
+            const ft = document.getElementById('fibrosisToggle');
+            state.excludeFibrosis ? ft.classList.add('active') : ft.classList.remove('active');
+            renderTrialList(); updateUI();
+        }
+
+        // Tooltip logic
+        const cvs = document.getElementById('forestPlot');
+        const tt = document.getElementById('forestTooltip');
+        cvs.addEventListener('mousemove', e => {
+            if(!cvs.dataMap) return;
+            const rect = cvs.getBoundingClientRect();
+            const y = (e.clientY - rect.top) * (cvs.height/rect.height); // scale correction
+            const { trials, yStart, rowH } = cvs.dataMap;
+            // Unscale Y for row calc (canvas height is scaled by dpr)
+            const dpr = window.devicePixelRatio || 1;
+            const logicY = (e.clientY - rect.top);
+            
+            const idx = Math.floor((logicY - yStart + (rowH/2)) / rowH);
+            if(idx >= 0 && idx < trials.length) {
+                const t = trials[idx];
+                tt.style.opacity = 1; tt.style.left = (e.clientX + 10) + 'px'; tt.style.top = (e.clientY + 10) + 'px';
+                tt.innerHTML = `<strong>${t.name}</strong><br>HR: ${t.hr} (${t.ci_lower}-${t.ci_upper})<br>Wt: ${t.final_weight_pct.toFixed(1)}%`;
+            } else { tt.style.opacity = 0; }
+        });
+        cvs.addEventListener('mouseleave', () => tt.style.opacity = 0);
+
+        // Init
+        window.addEventListener('resize', () => drawForestPlot(calculateMetaAnalysis(trials.filter(t=>t.selected))));
+        renderTrialList();
+        updateUI();
+
+    </script>
+</body>
+</html>
+
